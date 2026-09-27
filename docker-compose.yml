@@ -1,0 +1,45 @@
+# Runs the full stack with one command: docker compose up --build
+#
+# The browser talks to the API at http://localhost:8080, which is why the frontend is built with that
+# base URL and the backend allows exactly http://localhost:5173 as a CORS origin. APP_JWT_SECRET is
+# a local value here; substitute a real secret before using this composition anywhere shared.
+
+services:
+  api:
+    build:
+      context: ./backend
+    image: cyclone-impact-api:local
+    container_name: cyclone-api
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_PORT: "8080"
+      APP_JWT_SECRET: "${APP_JWT_SECRET:-local-compose-demo-secret-change-me-32b}"
+      APP_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173"
+      APP_DEMO_ANALYST_PASSWORD: "${APP_DEMO_ANALYST_PASSWORD:-cyclone-demo-analyst}"
+      APP_DEMO_ADMIN_PASSWORD: "${APP_DEMO_ADMIN_PASSWORD:-cyclone-demo-admin}"
+      APP_DEMO_VIEWER_PASSWORD: "${APP_DEMO_VIEWER_PASSWORD:-cyclone-demo-viewer}"
+      APP_RATE_LIMIT_CAPACITY: "120"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+
+  console:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: "http://localhost:8080"
+        VITE_DEMO_USERNAME: "analyst"
+        VITE_DEMO_PASSWORD: "${APP_DEMO_ANALYST_PASSWORD:-cyclone-demo-analyst}"
+    image: cyclone-impact-console:local
+    container_name: cyclone-console
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

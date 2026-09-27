@@ -1,0 +1,104 @@
+# Cyclone Impact & Infrastructure Vulnerability Forecaster
+#
+# Every value below can be overridden by an environment variable; the placeholders carry the
+# local-demo defaults. For anything shared, set APP_JWT_SECRET and replace app.security.users.
+
+spring:
+  application:
+    name: cyclone-impact-forecaster
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+  mvc:
+    problemdetails:
+      enabled: true
+  servlet:
+    multipart:
+      # No endpoint accepts a file upload, so the multipart parser is switched off entirely.
+      enabled: false
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  max-http-request-header-size: 16KB
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-exception: false
+    whitelabel:
+      enabled: false
+  tomcat:
+    max-swallow-size: 2MB
+    threads:
+      max: 100
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%X{correlationId:-no-correlation-id}] %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.enterprise.cyclone: INFO
+    org.springframework.security: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: Cyclone Impact & Infrastructure Vulnerability Forecaster
+    version: 1.0.0
+    description: Assesses critical infrastructure exposure against a tropical cyclone track
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+  api-docs:
+    path: /v3/api-docs
+
+app:
+  security:
+    issuer: ${APP_JWT_ISSUER:cyclone-impact-forecaster}
+    # Blank means "generate a random key for this boot". Set at least 32 bytes in any shared
+    # environment so that tokens survive a restart.
+    jwt-secret: ${APP_JWT_SECRET:}
+    token-ttl: ${APP_TOKEN_TTL:PT2H}
+    api-docs-public: ${APP_API_DOCS_PUBLIC:true}
+    allowed-origins: ${APP_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+    max-payload-bytes: ${APP_MAX_PAYLOAD_BYTES:1048576}
+    # Local demo directory. Replace it wholesale, or set the environment variables, before any
+    # deployment a stranger can reach.
+    users:
+      - username: ${APP_DEMO_ADMIN_USERNAME:admin}
+        password: ${APP_DEMO_ADMIN_PASSWORD:cyclone-demo-admin}
+        roles: [ADMIN, ANALYST, VIEWER]
+      - username: ${APP_DEMO_ANALYST_USERNAME:analyst}
+        password: ${APP_DEMO_ANALYST_PASSWORD:cyclone-demo-analyst}
+        roles: [ANALYST, VIEWER]
+      - username: ${APP_DEMO_VIEWER_USERNAME:viewer}
+        password: ${APP_DEMO_VIEWER_PASSWORD:cyclone-demo-viewer}
+        roles: [VIEWER]
+    rate-limit:
+      enabled: ${APP_RATE_LIMIT_ENABLED:true}
+      capacity: ${APP_RATE_LIMIT_CAPACITY:120}
+      refill-period: ${APP_RATE_LIMIT_REFILL:PT1M}
+      paths:
+        - /api/v1/impact-assessments/**
+        # Guarded as well, so the token endpoint cannot be used to grind passwords.
+        - /api/v1/auth/**
