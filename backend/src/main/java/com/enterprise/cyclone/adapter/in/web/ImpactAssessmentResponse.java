@@ -18,6 +18,8 @@ import java.util.Map;
  * @param stormPosition the interpolated storm state, not necessarily a published fix
  * @param summary aggregate statistics over the exposures
  * @param advisory the rendered early-warning text
+ * @param advisoryProvenance which generator wrote the advisory, in which language, and how long it
+ *        took, so a client can label model-written text differently from template text
  * @param exposures one entry per assessed asset, most exposed first
  */
 public record ImpactAssessmentResponse(
@@ -26,7 +28,26 @@ public record ImpactAssessmentResponse(
         StormPositionResponse stormPosition,
         ImpactSummaryResponse summary,
         String advisory,
+        AdvisoryProvenanceResponse advisoryProvenance,
         List<AssetExposureResponse> exposures) {
+
+    /**
+     * How the advisory was produced.
+     *
+     * @param generator {@code gemini} or {@code deterministic}
+     * @param model the model identifier, omitted when the deterministic generator wrote the text
+     * @param language the language the advisory was issued in
+     * @param degraded true when a model was attempted and failed, so the fallback ran
+     * @param detail why the fallback ran, or why no model was used
+     */
+    public record AdvisoryProvenanceResponse(
+            String generator,
+            String model,
+            String language,
+            long latencyMillis,
+            boolean degraded,
+            String detail) {
+    }
 
     /**
      * The interpolated storm state.

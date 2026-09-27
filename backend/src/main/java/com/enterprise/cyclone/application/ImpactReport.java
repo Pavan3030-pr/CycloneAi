@@ -13,6 +13,10 @@ import java.util.Objects;
  * <p>Every field is derived from the supplied track and assets at one instant, so a report is a
  * reproducible snapshot rather than a live view. Persisting it later is an adapter concern; nothing
  * in this class knows about storage or transport.
+ *
+ * <p>The advisory travels with its {@link AdvisoryProvenance} because a published warning has to
+ * carry the answer to "who wrote this, and did the model fail first?" — that answer cannot be
+ * reconstructed later from the text alone.
  */
 public record ImpactReport(
         String stormId,
@@ -20,6 +24,7 @@ public record ImpactReport(
         CycloneTrackPoint stormPosition,
         ImpactSummary summary,
         String advisory,
+        AdvisoryProvenance advisoryProvenance,
         List<AssetExposure> exposures) {
 
     public ImpactReport {
@@ -33,6 +38,7 @@ public record ImpactReport(
         if (advisory == null || advisory.isBlank()) {
             throw new IllegalArgumentException("advisory must not be blank");
         }
+        Objects.requireNonNull(advisoryProvenance, "advisoryProvenance must not be null");
         Objects.requireNonNull(exposures, "exposures must not be null");
         if (exposures.isEmpty()) {
             throw new IllegalArgumentException("exposures must contain at least one asset");
@@ -45,5 +51,12 @@ public record ImpactReport(
      */
     public List<AssetExposure> actionableExposures() {
         return exposures.stream().filter(AssetExposure::isActionable).toList();
+    }
+
+    /**
+     * The language this report's advisory was issued in.
+     */
+    public AdvisoryLanguage advisoryLanguage() {
+        return advisoryProvenance.language();
     }
 }

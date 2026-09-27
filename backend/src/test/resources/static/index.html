@@ -1,0 +1,19 @@
+<!doctype html>
+<!--
+  Fixture only.
+
+  This stands in for the real console during tests: the production image copies frontend/dist here
+  before packaging, and StaticSiteConfiguration registers the client-side routes only when a site is
+  present. Keeping a stub in the test resources means the same-origin deployment path — the route
+  forwards, the static-resource permissions, and the untouched API authorisation — is covered by the
+  build instead of only by a manual check against a container.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CycloneAI test shell</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

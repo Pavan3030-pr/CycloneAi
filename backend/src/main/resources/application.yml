@@ -73,6 +73,12 @@ springdoc:
     path: /v3/api-docs
 
 app:
+  web:
+    # Content security policy for every response from this service. Blank means the built-in policy,
+    # which is 'self' plus the two origins the console genuinely needs: Google Fonts for type and
+    # OpenStreetMap for map tiles. Set this to "default-src 'self'" when the site is served elsewhere.
+    content-security-policy: ${APP_CONTENT_SECURITY_POLICY:}
+
   security:
     issuer: ${APP_JWT_ISSUER:cyclone-impact-forecaster}
     # Blank means "generate a random key for this boot". Set at least 32 bytes in any shared
@@ -102,3 +108,39 @@ app:
         - /api/v1/impact-assessments/**
         # Guarded as well, so the token endpoint cannot be used to grind passwords.
         - /api/v1/auth/**
+        # Dispatch spends a messaging provider's quota as well as ours, so it is throttled too.
+        - /api/v1/advisories/**
+
+  # Advisory generation. The default of no API key is deliberate: without one the application still
+  # assesses storms and still issues advisories, from the deterministic generator, and says so in
+  # every response. Set APP_GEMINI_API_KEY to have a model write them instead.
+  ai:
+    advisory:
+      # auto   - use the model when a key is configured, otherwise the template
+      # gemini - require the model; a missing key is reported as degraded rather than fatal
+      # deterministic - never call the model, for offline or air-gapped deployments
+      mode: ${APP_ADVISORY_MODE:auto}
+      connect-timeout: ${APP_AI_CONNECT_TIMEOUT:PT2S}
+      # Bounded on purpose: an advisory that arrives after the briefing is worth less than a plain one
+      # that arrives now, which is what the deterministic fallback is for.
+      read-timeout: ${APP_AI_READ_TIMEOUT:PT12S}
+    gemini:
+      enabled: ${APP_GEMINI_ENABLED:true}
+      api-key: ${APP_GEMINI_API_KEY:}
+      model: ${APP_GEMINI_MODEL:gemini-2.5-flash}
+      endpoint: ${APP_GEMINI_ENDPOINT:https://generativelanguage.googleapis.com/v1beta}
+      max-output-tokens: ${APP_GEMINI_MAX_OUTPUT_TOKENS:900}
+      temperature: ${APP_GEMINI_TEMPERATURE:0.2}
+
+  # Publication of advisories: CAP 1.2 metadata and the outbound notification channel. With no
+  # webhook configured the console offers CAP download and reports that dispatch is unavailable.
+  dissemination:
+    sender: ${APP_ALERT_SENDER:cycloneai@localhost}
+    sender-name: ${APP_ALERT_SENDER_NAME:CycloneAI screening platform}
+    validity: ${APP_ALERT_VALIDITY:PT24H}
+    webhook:
+      enabled: ${APP_WEBHOOK_ENABLED:false}
+      url: ${APP_WEBHOOK_URL:}
+      token: ${APP_WEBHOOK_TOKEN:}
+      connect-timeout: ${APP_WEBHOOK_CONNECT_TIMEOUT:PT2S}
+      read-timeout: ${APP_WEBHOOK_READ_TIMEOUT:PT5S}

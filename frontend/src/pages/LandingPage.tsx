@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion';
 import {
   ArrowRight,
-  BellRing,
   Building2,
   CheckCircle2,
+  Compass,
   Database,
   FileText,
   Gauge,
@@ -12,8 +12,9 @@ import {
   PlayCircle,
   Radar,
   Route,
-  Satellite,
+  Send,
   ShieldCheck,
+  Sparkles,
   Timer,
   Waypoints,
 } from 'lucide-react';
@@ -44,6 +45,7 @@ export function LandingPage() {
         <Platform />
         <HowItWorks />
         <TrustBand />
+        <Roadmap />
         <ClosingCta />
       </main>
       <MarketingFooter />
@@ -171,18 +173,18 @@ const FEATURES = [
     points: ['Grid, arterial road, shelter types', 'Distance and modelled wind per asset', 'Explained, not just scored'],
   },
   {
-    icon: BellRing,
-    title: 'Early-warning advisories',
+    icon: Sparkles,
+    title: 'Gemini-written advisories',
     tone: 'coral' as const,
-    body: 'A briefing-ready advisory is generated for the assessment: storm identity, validity time, intensity, and the assets requiring action. Copy it straight into the channel your team already uses.',
-    points: ['Deterministic, reproducible text', 'States its own model limits', 'One click to copy'],
+    body: 'Gemini drafts the briefing from the assessment facts — storm identity, validity time, intensity and the assets needing action — in English, Hindi or Telugu. Every advisory states who wrote it and how long it took.',
+    points: ['Provenance shown on every response', 'Deterministic fallback if the model fails', 'A template never silently replaces the model'],
   },
   {
-    icon: Satellite,
-    title: 'Google Earth Engine ready',
-    tone: 'brand' as const,
-    body: 'Imagery cross-checks run through an optional Earth Engine adapter that degrades cleanly: with no credentials configured the console still assesses storms, it just stops annotating them.',
-    points: ['Optional by configuration', 'Never blocks an assessment', 'Earth observation aware'],
+    icon: Send,
+    title: 'Into the systems that warn people',
+    tone: 'accent' as const,
+    body: 'Every assessment renders as a CAP 1.2 alert other warning platforms can ingest, and can be published to a messaging gateway or control-room webhook when one is configured for the deployment.',
+    points: ['Standards-compliant CAP 1.2 download', 'Dispatch gated by configuration and role', 'Fails loudly, never half-sends'],
   },
 ];
 
@@ -255,7 +257,7 @@ const STEPS = [
   {
     icon: FileText,
     title: 'Issue the advisory',
-    body: 'Read the exposure table with the rule behind every level, then publish the generated advisory and the risk summary to the team that moves first.',
+    body: 'Read the exposure table with the rule behind every level, then download the CAP 1.2 alert or publish the advisory to the configured channel — and keep the provenance line that says whether Gemini or the template wrote it.',
   },
 ];
 
@@ -308,6 +310,57 @@ const THRESHOLDS = [
   { level: 'Medium', rule: '≥ 34 kt wind or ≤ 120 nm from centre', colour: '#f59e0b' },
   { level: 'Low', rule: 'Below every band — monitored, no action', colour: '#10b981' },
 ];
+
+/**
+ * What this build deliberately does not do yet.
+ *
+ * Stated on the marketing page because the alternative — implying a satellite pipeline that does not
+ * exist — is the one claim in climate software that damages a team's credibility fastest. A product
+ * that names its own boundary reads as engineering, not marketing.
+ */
+const ROADMAP = [
+  {
+    title: 'Earth observation cross-checks',
+    body: 'A Google Earth Engine adapter that verifies reported intensity against imagery and, later, measures coastal inundation extent.',
+  },
+  {
+    title: 'Storm surge and rainfall',
+    body: 'A second hazard field alongside modelled wind, so an asset can be flagged for surge depth as well as wind speed.',
+  },
+  {
+    title: 'Persistent history',
+    body: 'Assessments, advisories and dispatch receipts stored against a real database instead of living in the service that produced them.',
+  },
+];
+
+function Roadmap() {
+  return (
+    <section id="roadmap" className="border-t border-ink-200/70 bg-ink-50/60 section">
+      <div className="container-page">
+        <SectionHeading
+          eyebrow="Where this build stops"
+          title="What the platform does not claim yet"
+          body="The screening model, the AI advisory path, CAP 1.2 output and the demo you just ran are all live in this build. These three are not, and the interface does not pretend otherwise."
+        />
+
+        <div className="mt-12 grid gap-5 lg:grid-cols-3">
+          {ROADMAP.map((item, index) => (
+            <Reveal key={item.title} delay={index * 0.07}>
+              <div className="h-full rounded-2xl border border-dashed border-ink-300 bg-white/70 p-6">
+                <span className="inline-flex items-center gap-2 rounded-full bg-ink-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">
+                  <Compass className="size-3.5" />
+                  Planned
+                </span>
+                <h3 className="mt-4 font-display text-base font-bold tracking-tight text-ink-900">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-600">{item.body}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function TrustBand() {
   return (

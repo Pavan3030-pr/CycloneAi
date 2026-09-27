@@ -1,0 +1,11 @@
+# Keeps the build context to source only. Without this, node_modules and Maven output would be sent
+# to the daemon on every build — hundreds of megabytes that the Dockerfile never reads.
+**/node_modules
+**/dist
+**/target
+.git
+.github
+**/*.log
+.freebuff
+.env
+.env.*

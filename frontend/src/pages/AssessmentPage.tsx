@@ -1,12 +1,14 @@
 import { FileJson, ListOrdered, Play, ShieldAlert, Sparkles } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useAssessGeoJson, useAssessImpact, useAssets } from '@/api/hooks';
-import type { AssetInput, ImpactAssessment, TrackPointInput } from '@/api/types';
+import type { AssessmentLanguage, AssetInput, ImpactAssessment, TrackPointInput } from '@/api/types';
 import { ExposureTable } from '@/components/ExposureTable';
+import { ProvenanceChip } from '@/components/ProvenanceChip';
 import { MapLegend, TrackMap } from '@/components/TrackMap';
 import { SummaryCards } from '@/components/SummaryCards';
 import { Button, Card, ErrorNote, Field, Input, PageHeader, Select, Textarea } from '@/components/ui';
 import { bayOfBengalScenario } from '@/demo/demoScenario';
+import { ADVISORY_LANGUAGES, readPreferredLanguage, rememberPreferredLanguage } from '@/lib/languages';
 import { ASSET_TYPE_LABELS } from '@/lib/risk';
 import { evaluationOptions, parseTrackPoints, trackPointsFromFeatureCollection } from '@/lib/track';
 import { cn } from '@/lib/cn';
@@ -78,6 +80,9 @@ function StructuredAssessment() {
   const [stormId, setStormId] = useState(scenario.stormId);
   const [pointsJson, setPointsJson] = useState(() => JSON.stringify(scenario.points, null, 2));
   const [evaluationTime, setEvaluationTime] = useState(scenario.evaluationTime);
+  // Defaults to the language this operator last worked in, so a district running in Telugu does not
+  // have to pick the language again on every assessment.
+  const [language, setLanguage] = useState<AssessmentLanguage>(readPreferredLanguage);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(
     () => new Set(scenario.assets.map((asset) => asset.id)),
   );
@@ -130,11 +135,13 @@ function StructuredAssessment() {
       return;
     }
 
+    rememberPreferredLanguage(language);
     try {
       const assessment = await assess.mutateAsync({
         track: { stormId, points: parsedPoints },
         assets,
         evaluationTime: evaluationTime.length > 0 ? evaluationTime : null,
+        language,
       });
       publishScenario({ stormId, points: parsedPoints, assets, assessment });
       setResult(assessment);
@@ -153,9 +160,21 @@ function StructuredAssessment() {
           subtitle="Fixes may be listed in any order; the track aggregate sorts and validates them"
           className="xl:col-span-2"
         >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Field label="Storm identifier">
               <Input value={stormId} maxLength={32} onChange={(event) => setStormId(event.target.value)} />
+            </Field>
+            <Field label="Advisory language" hint="Written on the server, not translated here">
+              <Select
+                value={language}
+                onChange={(event) => setLanguage(event.target.value as AssessmentLanguage)}
+              >
+                {ADVISORY_LANGUAGES.map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
             </Field>
             <Field
               label="Evaluation instant"
@@ -283,6 +302,7 @@ function GeoJsonAssessment() {
   const scenario = bayOfBengalScenario;
   const [documentText, setDocumentText] = useState('');
   const [evaluationTime, setEvaluationTime] = useState('');
+  const [language, setLanguage] = useState<AssessmentLanguage>(readPreferredLanguage);
   const [validationError, setValidationError] = useState<unknown>(null);
   const [result, setResult] = useState<ImpactAssessment | null>(null);
   const [resultPoints, setResultPoints] = useState<TrackPointInput[]>([]);
@@ -300,11 +320,13 @@ function GeoJsonAssessment() {
       return;
     }
 
+    rememberPreferredLanguage(language);
     try {
       const assessment = await assessGeoJson.mutateAsync({
         featureCollection: parsedDocument,
         assets,
         evaluationTime: evaluationTime.length > 0 ? evaluationTime : null,
+        language,
       });
       const points = trackPointsFromFeatureCollection(parsedDocument);
       publishScenario({ stormId: assessment.stormId, points, assets, assessment });
@@ -344,6 +366,20 @@ function GeoJsonAssessment() {
                 placeholder="2023-12-04T12:00:00Z"
                 className="font-mono text-xs"
               />
+            </Field>
+          </div>
+          <div className="w-full sm:w-48">
+            <Field label="Advisory language">
+              <Select
+                value={language}
+                onChange={(event) => setLanguage(event.target.value as AssessmentLanguage)}
+              >
+                {ADVISORY_LANGUAGES.map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
             </Field>
           </div>
         </div>
@@ -392,6 +428,7 @@ function AssessmentResult({
       <Card
         title={`Result for ${assessment.stormId}`}
         subtitle="Published to the dashboard, the map and the advisory panel"
+        actions={<ProvenanceChip assessment={assessment} />}
       >
         <SummaryCards summary={assessment.summary} />
       </Card>

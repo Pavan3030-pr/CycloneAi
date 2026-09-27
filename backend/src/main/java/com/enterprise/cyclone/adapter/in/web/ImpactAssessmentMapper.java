@@ -2,6 +2,7 @@ package com.enterprise.cyclone.adapter.in.web;
 
 import com.enterprise.cyclone.adapter.in.web.ImpactAssessmentRequest.TrackPointRequest;
 import com.enterprise.cyclone.adapter.in.web.ImpactAssessmentRequest.TrackRequest;
+import com.enterprise.cyclone.application.AdvisoryProvenance;
 import com.enterprise.cyclone.application.ImpactReport;
 import com.enterprise.cyclone.application.ImpactSummary;
 import com.enterprise.cyclone.domain.model.AssetExposure;
@@ -83,7 +84,23 @@ public final class ImpactAssessmentMapper {
                         storm.coordinateString()),
                 toSummaryResponse(report.summary()),
                 report.advisory(),
+                toProvenanceResponse(report.advisoryProvenance()),
                 report.exposures().stream().map(ImpactAssessmentMapper::toExposureResponse).toList());
+    }
+
+    /**
+     * Renders advisory provenance, which tells a client whether a model or the template wrote the
+     * text and whether a model call was attempted and failed.
+     */
+    public static ImpactAssessmentResponse.AdvisoryProvenanceResponse toProvenanceResponse(
+            AdvisoryProvenance provenance) {
+        return new ImpactAssessmentResponse.AdvisoryProvenanceResponse(
+                provenance.generator(),
+                provenance.model(),
+                provenance.language().code(),
+                provenance.latencyMillis(),
+                provenance.degraded(),
+                provenance.detail());
     }
 
     private static CycloneTrackPoint toTrackPoint(TrackPointRequest request) {

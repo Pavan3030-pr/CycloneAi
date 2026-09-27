@@ -1,5 +1,6 @@
 package com.enterprise.cyclone.config;
 
+import com.enterprise.cyclone.application.AdvisoryComposer;
 import com.enterprise.cyclone.application.AdvisoryContext;
 import com.enterprise.cyclone.application.ImpactSummary;
 import com.enterprise.cyclone.application.port.AdvisoryGenerator;
@@ -24,6 +25,12 @@ import org.springframework.stereotype.Component;
  * summary aggregation and advisory rendering. If any of them is misfiring, the health endpoint says
  * so before a user discovers it. The objects used are ordinary domain values built at startup, not a
  * stubbed code path, so the probe exercises the same code a request does.
+ *
+ * <p>The self-test deliberately renders with the deterministic generator and never with the language
+ * model. A probe that called a third-party API would turn someone else's bad minute into a failed
+ * health check, and an orchestrator restarting this service because Gemini was slow is exactly the
+ * wrong response to a slow model. Which strategy is active is reported as a detail, so the state is
+ * still visible at a glance.
  */
 @Component
 public class DomainServicesHealthIndicator implements HealthIndicator {
@@ -37,10 +44,15 @@ public class DomainServicesHealthIndicator implements HealthIndicator {
 
     private final ExposureCalculator exposureCalculator;
     private final AdvisoryGenerator advisoryGenerator;
+    private final AdvisoryComposer advisoryComposer;
 
-    public DomainServicesHealthIndicator(ExposureCalculator exposureCalculator, AdvisoryGenerator advisoryGenerator) {
+    public DomainServicesHealthIndicator(
+            ExposureCalculator exposureCalculator,
+            AdvisoryGenerator advisoryGenerator,
+            AdvisoryComposer advisoryComposer) {
         this.exposureCalculator = exposureCalculator;
         this.advisoryGenerator = advisoryGenerator;
+        this.advisoryComposer = advisoryComposer;
     }
 
     @Override
@@ -66,6 +78,8 @@ public class DomainServicesHealthIndicator implements HealthIndicator {
             return Health.up()
                     .withDetail("exposureCalculator", exposureCalculator.getClass().getSimpleName())
                     .withDetail("advisoryGenerator", advisoryGenerator.getClass().getSimpleName())
+                    .withDetail("advisoryStrategy", advisoryComposer.modelEnabled() ? "gemini" : "deterministic")
+                    .withDetail("advisoryModel", advisoryComposer.modelEnabled() ? advisoryComposer.modelName() : "none")
                     .withDetail("selfTest", "interpolation, exposure, summary and advisory pipeline executed")
                     .withDetail("selfTestDurationMicroseconds", durationMicroseconds)
                     .build();

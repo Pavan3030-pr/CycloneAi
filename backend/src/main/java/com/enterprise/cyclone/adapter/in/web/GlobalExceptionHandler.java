@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -29,7 +31,13 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
  * <p>The domain signals contract violations with {@link IllegalArgumentException} and a message that
  * already names the offending field and its accepted range, so that message is passed through: it is
  * the difference between an integrator fixing a payload in a minute and opening a support ticket.
+ *
+ * <p>Ordered ahead of Spring's built-in {@code ProblemDetailsExceptionHandler}. Both advices can
+ * handle a validation failure, and with equal precedence the framework's wins, which silently takes
+ * the field-level {@code errors} array and the correlation id out of every 400 the console needs to
+ * explain to a user. Declaring precedence here is what makes the documented error contract real.
  */
+@Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice
 final class GlobalExceptionHandler {
 

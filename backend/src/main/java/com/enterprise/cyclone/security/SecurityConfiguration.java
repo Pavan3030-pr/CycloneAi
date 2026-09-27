@@ -8,6 +8,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -54,6 +55,42 @@ public class SecurityConfiguration {
     private static final int MINIMUM_SECRET_BYTES = 32;
     private static final String[] API_DOCUMENTATION_PATHS =
             {"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**"};
+
+    /**
+     * Paths of the bundled console, when one is packaged with this service.
+     *
+     * <p>Static files carry no authority, so reading them needs no token; and a browser cannot present
+     * a bearer header on a navigation, so requiring one here would simply make the console
+     * unreachable. Nothing under these paths touches the domain: every endpoint that reads or writes
+     * an asset, an assessment or an advisory stays behind {@code authenticated()} regardless of this
+     * list.
+     */
+    private static final String[] SITE_PATHS =
+            {"/", "/index.html", "/favicon.svg", "/robots.txt", "/assets/**", "/signin", "/signup", "/app",
+                    "/app/**"};
+
+    /**
+     * The content security policy applied to this service's responses.
+     *
+     * <p>Written out rather than left to a default because the same service now answers both the API
+     * and the console: the console loads its typefaces from Google Fonts and its map tiles from
+     * OpenStreetMap, so the policy has to name those two origins and nothing more. Every directive
+     * that blocks an origin not listed here is deliberate.
+     *
+     * <p>A deployment that serves the site from a CDN instead can set
+     * {@code APP_CONTENT_SECURITY_POLICY} to tighten this back to {@code 'self'}.
+     */
+    private static final String DEFAULT_CONTENT_SECURITY_POLICY = String.join("; ",
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline'",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "img-src 'self' data: https://*.tile.openstreetmap.org https://tile.openstreetmap.org",
+            "font-src 'self' data: https://fonts.gstatic.com",
+            // Same-origin only: the console calls its own /api, never a third-party API.
+            "connect-src 'self'",
+            "object-src 'none'",
+            "base-uri 'self'",
+            "frame-ancestors 'none'");
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -111,7 +148,12 @@ public class SecurityConfiguration {
             HttpSecurity http,
             SecurityProperties properties,
             ProblemResponseWriter problemWriter,
-            JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
+            JwtAuthenticationConverter jwtAuthenticationConverter,
+            @Value("${app.web.content-security-policy:}") String configuredContentSecurityPolicy) throws Exception {
+
+        String contentSecurityPolicy = configuredContentSecurityPolicy.isBlank()
+                ? DEFAULT_CONTENT_SECURITY_POLICY
+                : configuredContentSecurityPolicy;
 
         RestAuthenticationEntryPoint authenticationEntryPoint = new RestAuthenticationEntryPoint(problemWriter);
         RestAccessDeniedHandler accessDeniedHandler = new RestAccessDeniedHandler(problemWriter);
@@ -127,19 +169,22 @@ public class SecurityConfiguration {
                         .frameOptions(frame -> frame.deny())
                         .contentTypeOptions(Customizer.withDefaults())
                         .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.SAME_ORIGIN))
-                        .contentSecurityPolicy(csp -> csp.policyDirectives(
-                                "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
-                                        + "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; "
-                                        + "object-src 'none'; base-uri 'self'; frame-ancestors 'none'")))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(contentSecurityPolicy)))
                 .authorizeHttpRequests(authorize -> {
                     authorize
                             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                             .requestMatchers(HttpMethod.POST, "/api/v1/auth/token").permitAll()
                             .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                            .requestMatchers(SITE_PATHS).permitAll()
                             .requestMatchers(HttpMethod.GET, "/api/v1/assets/**").authenticated()
                             .requestMatchers(HttpMethod.POST, "/api/v1/assets/**").hasAnyRole("ANALYST", "ADMIN")
                             .requestMatchers(HttpMethod.DELETE, "/api/v1/assets/**").hasAnyRole("ANALYST", "ADMIN")
-                            .requestMatchers("/api/v1/impact-assessments/**").authenticated();
+                            .requestMatchers("/api/v1/impact-assessments/**").authenticated()
+                            // Pushing an advisory out of the building is a write-shaped action on the
+                            // real world: any signed-in role may see whether a channel exists, but only
+                            // an analyst or administrator may use it.
+                            .requestMatchers(HttpMethod.GET, "/api/v1/advisories/**").authenticated()
+                            .requestMatchers(HttpMethod.POST, "/api/v1/advisories/**").hasAnyRole("ANALYST", "ADMIN");
                     if (properties.apiDocsPublic()) {
                         authorize.requestMatchers(API_DOCUMENTATION_PATHS).permitAll();
                     } else {

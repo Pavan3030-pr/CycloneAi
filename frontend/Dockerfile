@@ -1,9 +1,13 @@
-# Build stage. The API base URL is compiled in, so it is passed as a build argument: the browser
-# resolves it, not the container, which is why it points at the host port rather than a service name.
+# Build stage.
+#
+# VITE_API_BASE_URL is deliberately empty: the bundle then calls /api relative to whatever host
+# served it, which is what this image's nginx.conf proxies to the API. Pass a URL only when the
+# console is served from a different origin than the API, and remember to add that origin to the
+# API's APP_ALLOWED_ORIGINS.
 FROM node:22-alpine AS build
 WORKDIR /workspace
 
-ARG VITE_API_BASE_URL=http://localhost:8080
+ARG VITE_API_BASE_URL=
 ARG VITE_DEMO_USERNAME=analyst
 ARG VITE_DEMO_PASSWORD=cyclone-demo-analyst
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL} \

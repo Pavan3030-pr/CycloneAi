@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import { login as loginRequest, setAccessToken } from '@/api/client';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { SESSION_EXPIRED_EVENT, login as loginRequest, setAccessToken } from '@/api/client';
 import type { Role } from '@/api/types';
 
 /**
@@ -75,6 +75,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPrincipal(null);
     storePrincipal(null);
   }, []);
+
+  /**
+   * Follows the client when it discards a rejected token.
+   *
+   * Without this the console would keep a principal that no request can act on, so every screen would
+   * render a 401 and the store would keep publishing a scenario nobody is authorised to refresh. The
+   * listener keeps one truth: if the token is gone, the session is gone.
+   */
+  useEffect(() => {
+    window.addEventListener(SESSION_EXPIRED_EVENT, logout);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, logout);
+  }, [logout]);
 
   const value = useMemo<AuthContextValue>(() => {
     const roles = principal?.roles ?? [];

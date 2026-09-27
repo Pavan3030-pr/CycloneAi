@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiRequest, fetchHealth } from './client';
+import { apiRequest, dispatchAdvisory, fetchAdvisoryChannel, fetchHealth } from './client';
 import type {
+  AssessmentLanguage,
   Asset,
   AssetInput,
   GeoJsonAssessmentInput,
@@ -20,6 +21,7 @@ import type {
 export const queryKeys = {
   health: ['health'] as const,
   assets: ['assets'] as const,
+  advisoryChannel: ['advisoryChannel'] as const,
 };
 
 export function useApiHealth() {
@@ -56,6 +58,20 @@ export function useDeleteAsset() {
   });
 }
 
+/**
+ * Publishes an advisory to the configured channel.
+ *
+ * A mutation, not a query: it has a side effect on the real world, it is not idempotent in the sense
+ * that matters (two calls send two messages), and the result is worth showing exactly once.
+ */
+export function useDispatchAdvisory() {
+  return useMutation({
+    mutationFn: ({ input, language }: { input: ImpactAssessmentInput; language: AssessmentLanguage }) =>
+      dispatchAdvisory(input, language),
+    retry: 0,
+  });
+}
+
 export function useAssessImpact() {
   return useMutation({
     mutationFn: (input: ImpactAssessmentInput) =>
@@ -63,6 +79,21 @@ export function useAssessImpact() {
         method: 'POST',
         body: JSON.stringify(input),
       }),
+  });
+}
+
+/**
+ * Whether an outbound notification channel is configured on this deployment.
+ *
+ * Fetched rather than assumed, so the console can offer publishing only when publishing is actually
+ * possible, and can explain the absence in the operator's own words when it is not.
+ */
+export function useAdvisoryChannel() {
+  return useQuery({
+    queryKey: queryKeys.advisoryChannel,
+    queryFn: fetchAdvisoryChannel,
+    staleTime: 60_000,
+    retry: false,
   });
 }
 

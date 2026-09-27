@@ -24,11 +24,14 @@ import java.util.List;
  * @param track the storm timeline to assess, non-null; fixes may arrive in any order
  * @param assets the assets to assess, non-null, non-empty and at most 500 entries
  * @param evaluationTime the instant to evaluate, or null to evaluate at the track's latest fix
+ * @param language the language to publish the advisory in, or null for English
  */
 public record ImpactAssessmentRequest(
         @NotNull @Valid TrackRequest track,
         @NotNull @NotEmpty @Size(max = 500) @Valid List<AssetRequest> assets,
-        Instant evaluationTime) {
+        Instant evaluationTime,
+        @Pattern(regexp = "(?i)en|hi|te", message = "must be one of en, hi or te")
+        @Size(max = 8) String language) {
 
     /**
      * The storm timeline in wire form.
