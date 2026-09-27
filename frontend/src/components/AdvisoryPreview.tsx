@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button, Card } from './ui';
 
@@ -12,17 +13,21 @@ export function AdvisoryPreview({ advisory }: { advisory: string }) {
   const previewLines = advisory.split('\n').slice(0, 6);
 
   return (
-    <Card title="Advisory" subtitle="First lines of the generated text">
-      <pre className="overflow-hidden whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-slate-700 dark:text-slate-200">
-        {previewLines.join('\n')}
-      </pre>
-      <div className="mt-3">
-        <Link to="/advisory">
-          <Button variant="secondary" className="w-full">
-            Read the full advisory
+    <Card
+      title="Advisory"
+      subtitle="First lines of the generated text"
+      actions={
+        <Link to="/app/advisory">
+          <Button variant="ghost">
+            Full text
+            <ArrowRight className="size-3.5" />
           </Button>
         </Link>
-      </div>
+      }
+    >
+      <pre className="overflow-hidden whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-ink-700">
+        {previewLines.join('\n')}
+      </pre>
     </Card>
   );
 }

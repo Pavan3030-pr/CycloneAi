@@ -2,93 +2,155 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Global layer.
+ *
+ * This file owns the primitives every page composes from: surfaces, form controls, focus rings and
+ * the marketing container. Pages are then written almost entirely in layout utilities, which is what
+ * keeps spacing consistent across the landing page and the console.
+ */
+
 @layer base {
   html {
-    color-scheme: light dark;
+    color-scheme: light;
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
-    @apply bg-slate-100 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+    @apply bg-ink-50 font-sans text-ink-700 antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'ss01';
   }
 
-  /* A visible focus ring everywhere, because an operations console gets driven by keyboard. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display tracking-tight text-ink-900;
+    text-wrap: balance;
+  }
+
+  /* A visible focus ring everywhere: an operations console gets driven by keyboard. */
   :focus-visible {
-    @apply outline-none ring-2 ring-sky-500/60 ring-offset-2 ring-offset-slate-100 dark:ring-offset-slate-950;
+    @apply outline-none ring-2 ring-brand-500/70 ring-offset-2 ring-offset-white;
+  }
+
+  ::selection {
+    @apply bg-brand-600/20 text-brand-900;
+  }
+
+  /* Firefox renders a chunky default scrollbar that fights the light surfaces. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.ink.300') transparent;
   }
 }
 
 @layer components {
+  /* Page container. One width, one gutter, used by marketing and console alike. */
+  .container-page {
+    @apply mx-auto w-full max-w-[80rem] px-5 sm:px-8;
+  }
+
+  /* Marketing section rhythm: generous, and shrinking gracefully on small screens. */
+  .section {
+    @apply py-16 sm:py-24 lg:py-28;
+  }
+
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-700;
+  }
+
   .card {
-    @apply rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900;
+    @apply rounded-2xl border border-ink-200/80 bg-white shadow-soft;
   }
 
   .tile {
-    @apply rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900;
+    @apply rounded-xl border border-ink-200/70 bg-white p-4 shadow-hair;
   }
 
   .label {
-    @apply block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400;
+    @apply block text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500;
   }
 
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 transition focus:border-sky-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder-slate-500;
+    @apply w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 shadow-hair transition placeholder:text-ink-400 hover:border-ink-300 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10;
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition duration-200 ease-premium active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
   }
 
   .badge {
-    @apply inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset;
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset;
   }
 
+  /* Console navigation: a pill that gains weight rather than a full-width block. */
   .nav-link {
-    @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-200/70 dark:text-slate-300 dark:hover:bg-slate-800/70;
+    @apply flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-ink-600 transition hover:bg-ink-100 hover:text-ink-900;
   }
 
   .nav-link-active {
-    @apply bg-sky-600/10 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300;
+    @apply bg-brand-50 text-brand-700 hover:bg-brand-50 hover:text-brand-700;
+  }
+
+  /* Inline text link, used in prose and in the footer. */
+  .link-quiet {
+    @apply font-medium text-brand-700 underline-offset-4 transition hover:text-brand-800 hover:underline;
   }
 }
 
-/* Leaflet ships a light-only basemap; inverting the tiles keeps the map legible next to a dark
-   dashboard without needing a second tile provider or an API key. */
+@layer utilities {
+  .shadow-ring-inset {
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.6);
+  }
+
+  /* Masks the top edge of a decorative panel so it fades out instead of being cut off. */
+  .fade-bottom {
+    mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+  }
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Leaflet
+ *
+ * The stock basemap is light already, so no tile filtering is needed; it only has to stop looking
+ * like a 2012 embed next to the rest of the interface.
+ * ---------------------------------------------------------------------------------------------- */
 .leaflet-container {
-  background: #e2e8f0;
+  background: theme('colors.ink.100');
   font-family: inherit;
-}
-
-.dark .leaflet-container {
-  background: #0f172a;
-}
-
-.dark .leaflet-tile {
-  filter: brightness(0.7) invert(1) contrast(2.4) hue-rotate(200deg) saturate(0.45) brightness(0.95);
+  font-size: 13px;
+  z-index: 0;
 }
 
 .leaflet-control-attribution {
+  background: rgb(255 255 255 / 0.82);
+  backdrop-filter: blur(6px);
   font-size: 10px;
+  color: theme('colors.ink.500');
 }
 
-.dark .leaflet-control-attribution,
-.dark .leaflet-bar a {
-  background: rgba(15, 23, 42, 0.85);
-  color: #94a3b8;
+.leaflet-control-attribution a {
+  color: theme('colors.brand.700');
 }
 
-.dark .leaflet-control-attribution a {
-  color: #7dd3fc;
+.leaflet-bar a {
+  border-color: theme('colors.ink.200');
+  color: theme('colors.ink.700');
+}
+
+.leaflet-bar a:hover {
+  background: theme('colors.ink.100');
 }
 
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
-  background: #ffffff;
-  color: #0f172a;
-  border-radius: 0.6rem;
+  border-radius: 0.85rem;
+  box-shadow: theme('boxShadow.card');
+  color: theme('colors.ink.800');
 }
 
-.dark .leaflet-popup-content-wrapper,
-.dark .leaflet-popup-tip {
-  background: #1e293b;
-  color: #e2e8f0;
+.leaflet-popup-content {
+  margin: 0.75rem 0.9rem;
 }

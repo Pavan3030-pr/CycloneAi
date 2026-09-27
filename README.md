@@ -1,11 +1,12 @@
-# Cyclone Impact & Infrastructure Vulnerability Forecaster
+# CycloneAI — Cyclone Impact & Infrastructure Vulnerability Forecaster
 
 An end-to-end platform that answers one operational question: **given this cyclone track, which
 critical infrastructure is about to be hit, how hard, and why?**
 
 A Spring Boot domain core ingests NOAA/JTWC-style tracks, interpolates the storm between published
 fixes, scores every registered asset, and generates an early-warning advisory. A React console runs
-assessments against the live API and puts the result on a map.
+assessments against the live API and puts the result on a map, behind a public product site that
+explains the model and starts a real assessment in one click.
 
 ```
 cyclone-impact-forecaster/
@@ -18,7 +19,13 @@ cyclone-impact-forecaster/
 │   │   ├── security/        Spring Security 6, JWT, rate limiting, correlation ids
 │   │   └── config/          wiring, OpenAPI, JSON hardening, health indicator
 │   └── src/main/resources/application.yml
-├── frontend/                Vite · React 18 · TypeScript · Tailwind · Leaflet
+├── frontend/                Vite · React 18 · TypeScript · Tailwind · Framer Motion · Leaflet
+│   └── src/
+│       ├── pages/           landing, sign in, sign up, and the five console screens
+│       ├── components/      design system, map, logo, marketing and auth shells
+│       ├── api/             typed client and React Query hooks for the live API
+│       ├── demo/            the Bay of Bengal scenario and its one-click driver
+│       └── store/           the active scenario shared by the dashboard, map and advisory
 ├── docker-compose.yml
 ├── run-demo.sh
 └── README.md
@@ -72,9 +79,23 @@ environment before using this anywhere shared.
 
 ### Then
 
-Open <http://localhost:5173> and click **Demo mode**. That signs in as the demo analyst, registers
-seven coastal assets, runs a real assessment against the Bay of Bengal storm, and lands you on the
-dashboard. OpenAPI documentation is at <http://localhost:8080/swagger-ui.html>.
+Open <http://localhost:5173> for the product site, then click **Start free demo**. That signs in as
+the demo analyst, registers seven coastal assets, runs a real assessment against the Bay of Bengal
+storm and lands you in the console at `/app`. OpenAPI documentation is at
+<http://localhost:8080/swagger-ui.html>.
+
+### Frontend routes
+
+| Route | Screen | Access |
+|-------|--------|--------|
+| `/` | Landing page: hero, platform, how it works, trust | public |
+| `/signin` | Sign in · add `?demo=1` to run the demonstration immediately | public |
+| `/signup` | Create an account (request flow — accounts are provisioned from configuration) | public |
+| `/app` | Dashboard: risk summary, map, action list, advisory preview | signed in |
+| `/app/track` | Track visualizer: fixes, screening bands, assessed assets | signed in |
+| `/app/assessment` | Impact assessment: structured track or pasted GeoJSON | signed in |
+| `/app/assets` | Asset registry (writes need ANALYST or ADMIN) | signed in |
+| `/app/advisory` | Generated early-warning advisory | signed in |
 
 ---
 
@@ -85,9 +106,10 @@ of Bengal to landfall near Bapatla, Andhra Pradesh. It is evaluated at `2023-12-
 **mid-interval** instant, so the interpolated centre is a modelled position rather than a published
 fix — which is the whole point of the track aggregate.
 
-Expected result: **2 critical, 1 high, 1 medium, 3 low.** The Bapatla coastal shelter sits 13 nm from
-the interpolated centre and the NH-16 Krishna delta span 19 nm, so both trip the distance-based
-hurricane-force band even though the storm peaks at 58 kt.
+Expected result: **2 critical, 1 high, 1 medium, 3 low.** At the evaluation instant the interpolated
+centre carries 48 kt, yet the Bapatla coastal shelter sits 13 nm from it and the NH-16 Krishna delta
+span 19 nm, so both trip the distance-based hurricane-force band — the case the model exists to
+catch, and one a peak-intensity-only view would miss.
 
 ---
 

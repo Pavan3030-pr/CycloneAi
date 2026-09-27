@@ -1,13 +1,15 @@
-import { useMemo, useState } from 'react';
+import { FileJson, ListOrdered, Play, ShieldAlert, Sparkles } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useAssessGeoJson, useAssessImpact, useAssets } from '@/api/hooks';
 import type { AssetInput, ImpactAssessment, TrackPointInput } from '@/api/types';
 import { ExposureTable } from '@/components/ExposureTable';
 import { MapLegend, TrackMap } from '@/components/TrackMap';
 import { SummaryCards } from '@/components/SummaryCards';
-import { Button, Card, ErrorNote, Field, Input, Select } from '@/components/ui';
+import { Button, Card, ErrorNote, Field, Input, PageHeader, Select, Textarea } from '@/components/ui';
 import { bayOfBengalScenario } from '@/demo/demoScenario';
 import { ASSET_TYPE_LABELS } from '@/lib/risk';
 import { evaluationOptions, parseTrackPoints, trackPointsFromFeatureCollection } from '@/lib/track';
+import { cn } from '@/lib/cn';
 import { publishScenario } from '@/store/scenarioStore';
 
 /**
@@ -23,18 +25,51 @@ export function AssessmentPage() {
   const [mode, setMode] = useState<'structured' | 'geojson'>('structured');
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant={mode === 'structured' ? 'primary' : 'secondary'} onClick={() => setMode('structured')}>
-          Structured track
-        </Button>
-        <Button variant={mode === 'geojson' ? 'primary' : 'secondary'} onClick={() => setMode('geojson')}>
-          Paste GeoJSON
-        </Button>
-      </div>
+    <>
+      <PageHeader
+        eyebrow="New run"
+        title="Impact assessment"
+        description="Submit a track and a set of assets to the exposure model. The result is published to the dashboard, the map and the advisory panel."
+        actions={
+          <div className="flex rounded-xl border border-ink-200 bg-white p-1 shadow-hair">
+            <ModeButton active={mode === 'structured'} onClick={() => setMode('structured')} icon={<ListOrdered className="size-4" />}>
+              Structured track
+            </ModeButton>
+            <ModeButton active={mode === 'geojson'} onClick={() => setMode('geojson')} icon={<FileJson className="size-4" />}>
+              Paste GeoJSON
+            </ModeButton>
+          </div>
+        }
+      />
 
       {mode === 'structured' ? <StructuredAssessment /> : <GeoJsonAssessment />}
-    </div>
+    </>
+  );
+}
+
+function ModeButton({
+  active,
+  onClick,
+  icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition',
+        active ? 'bg-brand-700 text-white shadow-glow' : 'text-ink-600 hover:bg-ink-100 hover:text-ink-900',
+      )}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }
 
@@ -64,7 +99,10 @@ function StructuredAssessment() {
     [registry.data],
   );
 
-  const availableAssets = useMemo(() => dedupeById([...registryAssets, ...scenario.assets]), [registryAssets, scenario.assets]);
+  const availableAssets = useMemo(
+    () => dedupeById([...registryAssets, ...scenario.assets]),
+    [registryAssets, scenario.assets],
+  );
 
   const points = useMemo<TrackPointInput[] | null>(() => {
     try {
@@ -105,16 +143,29 @@ function StructuredAssessment() {
     }
   };
 
+  const selectedAssets = availableAssets.filter((asset) => selectedAssetIds.has(asset.id));
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-        <Card title="Storm track" subtitle="Fixes may be listed in any order; the aggregate sorts them" className="xl:col-span-2">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Card
+          title="Storm track"
+          subtitle="Fixes may be listed in any order; the track aggregate sorts and validates them"
+          className="xl:col-span-2"
+        >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Field label="Storm identifier">
               <Input value={stormId} maxLength={32} onChange={(event) => setStormId(event.target.value)} />
             </Field>
-            <Field label="Evaluation instant" hint={points === null ? 'Fix the JSON to choose a time' : 'Fixes and mid-interval points'}>
-              <Select value={evaluationTime} onChange={(event) => setEvaluationTime(event.target.value)} disabled={options.length === 0}>
+            <Field
+              label="Evaluation instant"
+              hint={points === null ? 'Fix the JSON to choose a time' : 'Fixes and mid-interval points'}
+            >
+              <Select
+                value={evaluationTime}
+                onChange={(event) => setEvaluationTime(event.target.value)}
+                disabled={options.length === 0}
+              >
                 {options.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -131,27 +182,31 @@ function StructuredAssessment() {
             </Field>
           </div>
 
-          <Field label="Track points (JSON)">
-            <textarea
-              value={pointsJson}
-              onChange={(event) => setPointsJson(event.target.value)}
-              spellCheck={false}
-              rows={12}
-              className="input font-mono text-xs"
-            />
-          </Field>
+          <div className="mt-4">
+            <Field label="Track points (JSON)">
+              <Textarea
+                value={pointsJson}
+                onChange={(event) => setPointsJson(event.target.value)}
+                spellCheck={false}
+                rows={12}
+              />
+            </Field>
+          </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-3">
             <Button variant="secondary" onClick={() => setPointsJson(JSON.stringify(scenario.points, null, 2))}>
+              <Sparkles className="size-4" />
               Load demonstration track
             </Button>
-            {assessmentSpans(points) ? <span className="self-center text-xs text-slate-500 dark:text-slate-400">{assessmentSpans(points)}</span> : null}
+            {assessmentSpans(points) !== null ? (
+              <span className="font-mono text-xs text-ink-500">{assessmentSpans(points)}</span>
+            ) : null}
           </div>
         </Card>
 
         <Card
           title="Assets to assess"
-          subtitle={`${selectedAssetIds.size} selected`}
+          subtitle={`${selectedAssetIds.size} of ${availableAssets.length} selected`}
           actions={
             <Button
               variant="ghost"
@@ -165,54 +220,61 @@ function StructuredAssessment() {
             </Button>
           }
         >
-          {registry.isPending ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">Loading the registry…</p>
-          ) : null}
-          <ul className="space-y-2">
+          {registry.isPending ? <p className="text-sm text-ink-500">Loading the registry…</p> : null}
+          <ul className="space-y-2.5">
             {availableAssets.map((asset) => (
-              <li key={asset.id} className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  className="mt-1 size-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 dark:border-slate-600"
-                  checked={selectedAssetIds.has(asset.id)}
-                  onChange={(event) =>
-                    setSelectedAssetIds((current) => {
-                      const next = new Set(current);
-                      if (event.target.checked) {
-                        next.add(asset.id);
-                      } else {
-                        next.delete(asset.id);
-                      }
-                      return next;
-                    })
-                  }
-                />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm text-slate-800 dark:text-slate-100">{asset.name}</span>
-                  <span className="block text-[11px] text-slate-500 dark:text-slate-400">
-                    {ASSET_TYPE_LABELS[asset.assetType]} · {asset.id}
+              <li key={asset.id}>
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg p-2 transition hover:bg-ink-50">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 rounded border-ink-300 text-brand-700 focus:ring-brand-500"
+                    checked={selectedAssetIds.has(asset.id)}
+                    onChange={(event) =>
+                      setSelectedAssetIds((current) => {
+                        const next = new Set(current);
+                        if (event.target.checked) {
+                          next.add(asset.id);
+                        } else {
+                          next.delete(asset.id);
+                        }
+                        return next;
+                      })
+                    }
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-ink-800">{asset.name}</span>
+                    <span className="block text-[11px] text-ink-500">
+                      {ASSET_TYPE_LABELS[asset.assetType]} · {asset.id}
+                    </span>
                   </span>
-                </span>
+                </label>
               </li>
             ))}
           </ul>
           {availableAssets.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">The registry is empty; the demonstration assets are shown instead.</p>
+            <p className="text-sm text-ink-500">
+              The registry is empty; the demonstration assets are offered instead.
+            </p>
           ) : null}
         </Card>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={submit} busy={assess.isPending}>
-          Run assessment
+      <div className="card flex flex-wrap items-center gap-4 px-5 py-4">
+        <Button onClick={submit} busy={assess.isPending} className="px-5">
+          {assess.isPending ? 'Running' : 'Run assessment'}
+          {assess.isPending ? null : <Play className="size-4" />}
         </Button>
-        <span className="text-xs text-slate-500 dark:text-slate-400">
-          Sends the track and the selected assets to POST /api/v1/impact-assessments.
+        <span className="text-xs text-ink-500">
+          Sends the track and {selectedAssets.length} selected {selectedAssets.length === 1 ? 'asset' : 'assets'} to{' '}
+          <span className="font-mono">POST /api/v1/impact-assessments</span>
         </span>
       </div>
 
       <ErrorNote error={validationError ?? assess.error} />
-      {result !== null ? <AssessmentResult assessment={result} points={points ?? []} assets={availableAssets.filter((a) => selectedAssetIds.has(a.id))} /> : null}
+
+      {result !== null ? (
+        <AssessmentResult assessment={result} points={points ?? []} assets={selectedAssets} />
+      ) : null}
     </div>
   );
 }
@@ -257,46 +319,60 @@ function GeoJsonAssessment() {
     <div className="space-y-5">
       <Card title="GeoJSON track document" subtitle="A FeatureCollection exactly as an agency publishes it">
         <Field label="Feature collection">
-          <textarea
+          <Textarea
             value={documentText}
             onChange={(event) => setDocumentText(event.target.value)}
             spellCheck={false}
             rows={12}
             placeholder='{ "type": "FeatureCollection", "features": [ … ] }'
-            className="input font-mono text-xs"
           />
         </Field>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={() => setDocumentText(JSON.stringify(demoFeatureCollection(), null, 2))}>
+        <div className="mt-4 flex flex-wrap items-end gap-4">
+          <Button
+            variant="secondary"
+            onClick={() => setDocumentText(JSON.stringify(demoFeatureCollection(), null, 2))}
+          >
+            <Sparkles className="size-4" />
             Load demonstration GeoJSON
           </Button>
-          <Field label="Evaluation instant (optional)">
-            <Input
-              value={evaluationTime}
-              onChange={(event) => setEvaluationTime(event.target.value)}
-              placeholder="2023-12-04T12:00:00Z"
-              className="w-64 font-mono text-xs"
-            />
-          </Field>
+          <div className="w-full sm:w-72">
+            <Field label="Evaluation instant (optional)">
+              <Input
+                value={evaluationTime}
+                onChange={(event) => setEvaluationTime(event.target.value)}
+                placeholder="2023-12-04T12:00:00Z"
+                className="font-mono text-xs"
+              />
+            </Field>
+          </div>
         </div>
 
-        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-          The server accepts NHC/JTWC property names (maxwind, mslp, validtime), skips non-Point features such as the drawn
-          track line and the wind cone, and understands ATCF compact times.
+        <p className="mt-4 rounded-xl border border-ink-200 bg-ink-50/60 px-4 py-3 text-xs leading-relaxed text-ink-600">
+          The server accepts NHC / JTWC property names (<span className="font-mono">maxwind</span>,{' '}
+          <span className="font-mono">mslp</span>, <span className="font-mono">validtime</span>), skips non-Point
+          features such as a drawn track line or wind cone, and understands ATCF compact times like{' '}
+          <span className="font-mono">2023120406</span>.
         </p>
       </Card>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={submit} busy={assessGeoJson.isPending} disabled={documentText.trim().length === 0}>
-          Run assessment from GeoJSON
+      <div className="card flex flex-wrap items-center gap-4 px-5 py-4">
+        <Button
+          onClick={submit}
+          busy={assessGeoJson.isPending}
+          disabled={documentText.trim().length === 0}
+          className="px-5"
+        >
+          {assessGeoJson.isPending ? 'Running' : 'Run assessment from GeoJSON'}
+          {assessGeoJson.isPending ? null : <ShieldAlert className="size-4" />}
         </Button>
-        <span className="text-xs text-slate-500 dark:text-slate-400">
-          Sends the document to POST /api/v1/impact-assessments/from-geojson
+        <span className="text-xs text-ink-500">
+          Sends the document to <span className="font-mono">POST /api/v1/impact-assessments/from-geojson</span>
         </span>
       </div>
 
       <ErrorNote error={validationError ?? assessGeoJson.error} />
+
       {result !== null ? <AssessmentResult assessment={result} points={resultPoints} assets={assets} /> : null}
     </div>
   );
@@ -313,7 +389,10 @@ function AssessmentResult({
 }) {
   return (
     <div className="space-y-5">
-      <Card title={`Result for ${assessment.stormId}`} subtitle="Published to the dashboard, map and advisory panel">
+      <Card
+        title={`Result for ${assessment.stormId}`}
+        subtitle="Published to the dashboard, the map and the advisory panel"
+      >
         <SummaryCards summary={assessment.summary} />
       </Card>
       <Card title="Spatial view" subtitle="Marker colour is the assessed risk level">
@@ -324,11 +403,11 @@ function AssessmentResult({
           assets={assets}
           heightClass="h-[24rem]"
         />
-        <div className="mt-3">
+        <div className="mt-3.5">
           <MapLegend />
         </div>
       </Card>
-      <Card title="Exposures">
+      <Card title="Exposures" subtitle="Most severe first, then nearest">
         <ExposureTable exposures={assessment.exposures} />
       </Card>
     </div>

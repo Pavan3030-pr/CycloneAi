@@ -1,15 +1,17 @@
-import { useState } from 'react';
+import { Activity, Gauge, MapPin, Radar, Sparkles, Wind } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { AssetExposure } from '@/api/types';
 import { AdvisoryPreview } from '@/components/AdvisoryPreview';
 import { ExposureTable } from '@/components/ExposureTable';
 import { CategoryBadge, RiskBadge } from '@/components/RiskBadge';
 import { SummaryCards } from '@/components/SummaryCards';
-import { TrackMap, MapLegend } from '@/components/TrackMap';
-import { Button, Card, EmptyState, ErrorNote } from '@/components/ui';
+import { MapLegend, TrackMap } from '@/components/TrackMap';
+import { Button, Card, EmptyState, ErrorNote, PageHeader } from '@/components/ui';
 import { bayOfBengalScenario } from '@/demo/demoScenario';
 import { useRunDemo } from '@/demo/useRunDemo';
 import { formatDecimal, formatInstant } from '@/lib/format';
+import { RISK_STYLES } from '@/lib/risk';
 import { useActiveScenario } from '@/store/scenarioStore';
 
 /**
@@ -35,111 +37,153 @@ export function Dashboard() {
 
   if (scenario === null) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
-        <Card title="No storm under assessment yet" subtitle="The console reads from the last assessment you ran">
-          <EmptyState
-            title="Load the demonstration storm"
-            description={`A synthetic six-hourly track from the southern Bay of Bengal to landfall near Bapatla, assessed against ${bayOfBengalScenario.assets.length} coastal assets through the live API.`}
-            action={
-              <Button onClick={runDemo} busy={demo.isRunning}>
-                Load demonstration storm
-              </Button>
-            }
-          />
-          <div className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
-            or{' '}
-            <Link className="font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400" to="/assessment">
-              run your own assessment
-            </Link>
+      <>
+        <PageHeader
+          eyebrow="Overview"
+          title="Dashboard"
+          description="The console reads from the last assessment you ran against the live API."
+        />
+        <div className="mx-auto max-w-3xl">
+          <div className="card p-6 sm:p-8">
+            <EmptyState
+              icon={<Radar className="size-5" />}
+              title="Load the demonstration storm"
+              description={`A synthetic six-hourly track from the southern Bay of Bengal to landfall near Bapatla, assessed against ${bayOfBengalScenario.assets.length} coastal assets through the live exposure model.`}
+              action={
+                <>
+                  <Button onClick={runDemo} busy={demo.isRunning}>
+                    {demo.isRunning ? null : <Sparkles className="size-4" />}
+                    {demo.isRunning ? 'Running the demo storm…' : 'Load demonstration storm'}
+                  </Button>
+                  <Link to="/app/assessment">
+                    <Button variant="secondary">Run your own assessment</Button>
+                  </Link>
+                </>
+              }
+            />
+            <ErrorNote error={error ?? demo.error} className="mt-5" />
           </div>
-          {error !== null ? <div className="mt-4"><ErrorNote error={error} /></div> : null}
-        </Card>
-      </div>
+        </div>
+      </>
     );
   }
 
   const { assessment, points, assets } = scenario;
-  const actionables = assessment.exposures.filter((exposure) => isActionable(exposure));
+  const actionables = assessment.exposures.filter(isActionable);
+  const highest = RISK_STYLES[assessment.summary.highestRisk];
 
   return (
-    <div className="space-y-5">
-      <Card
+    <>
+      <PageHeader
+        eyebrow="Overview"
         title={`Storm ${scenario.stormId}`}
-        subtitle={`Evaluated at ${formatInstant(assessment.evaluatedAt)}`}
+        description={`Assessed against ${assessment.summary.totalAssets} assets at ${formatInstant(assessment.evaluatedAt)}. Highest assessed level: ${highest.label}.`}
         actions={
           <>
             <CategoryBadge category={assessment.stormPosition.category} />
             <RiskBadge level={assessment.summary.highestRisk} />
+            <Button variant="secondary" onClick={runDemo} busy={demo.isRunning}>
+              {demo.isRunning ? 'Running…' : 'Re-run demo'}
+            </Button>
           </>
         }
-      >
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Metric label="Interpolated centre" value={`${formatDecimal(assessment.stormPosition.latitude, 2)}°, ${formatDecimal(assessment.stormPosition.longitude, 2)}°`} />
-          <Metric label="Max sustained wind" value={`${assessment.stormPosition.windSpeedKnots} kt`} />
-          <Metric label="Central pressure" value={`${assessment.stormPosition.centralPressureMb} mb`} />
-          <Metric label="GeoJSON position" value={assessment.stormPosition.coordinateString} mono />
-        </div>
-      </Card>
+      />
 
-      <SummaryCards summary={assessment.summary} />
+      <div className="space-y-5">
+        <ErrorNote error={error ?? demo.error} />
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-        <Card title="Track and assets" subtitle="Markers coloured by assessed risk" className="xl:col-span-2">
-          <TrackMap
-            points={points}
-            stormPosition={assessment.stormPosition}
-            exposures={assessment.exposures}
-            assets={assets}
-            heightClass="h-[24rem]"
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            icon={<MapPin className="size-4" />}
+            label="Interpolated centre"
+            value={`${formatDecimal(assessment.stormPosition.latitude, 2)}°, ${formatDecimal(assessment.stormPosition.longitude, 2)}°`}
           />
-          <div className="mt-3">
-            <MapLegend />
-          </div>
-        </Card>
+          <MetricCard
+            icon={<Wind className="size-4" />}
+            label="Max sustained wind"
+            value={`${assessment.stormPosition.windSpeedKnots} kt`}
+          />
+          <MetricCard
+            icon={<Gauge className="size-4" />}
+            label="Central pressure"
+            value={`${assessment.stormPosition.centralPressureMb} mb`}
+          />
+          <MetricCard
+            icon={<Activity className="size-4" />}
+            label="GeoJSON position"
+            value={assessment.stormPosition.coordinateString}
+            mono
+          />
+        </div>
 
-        <div className="space-y-5">
+        <SummaryCards summary={assessment.summary} />
+
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
           <Card
-            title="Requiring action"
-            subtitle={`${actionables.length} of ${assessment.summary.totalAssets} assets at high or critical risk`}
+            title="Track and assets"
+            subtitle="Markers coloured by assessed risk; dashed rings are the screening bands"
+            className="xl:col-span-2"
           >
-            {actionables.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                No asset reached high or critical risk at this evaluation time.
-              </p>
-            ) : (
-              <ul className="space-y-2.5">
-                {actionables.slice(0, 6).map((exposure) => (
-                  <li key={exposure.assetId} className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
-                        {exposure.assetName}
-                      </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {formatDecimal(exposure.distanceNauticalMiles)} nm · {exposure.estimatedWindAtAsset} kt
-                      </p>
-                    </div>
-                    <RiskBadge level={exposure.riskLevel} />
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="mt-4">
-              <Link to="/advisory">
-                <Button variant="secondary" className="w-full">
-                  Open advisory
-                </Button>
-              </Link>
+            <TrackMap
+              points={points}
+              stormPosition={assessment.stormPosition}
+              exposures={assessment.exposures}
+              assets={assets}
+              heightClass="h-[24rem]"
+            />
+            <div className="mt-3.5">
+              <MapLegend />
             </div>
           </Card>
 
-          <AdvisoryPreview advisory={assessment.advisory} />
-        </div>
-      </div>
+          <div className="space-y-5">
+            <Card
+              title="Requiring action"
+              subtitle={`${actionables.length} of ${assessment.summary.totalAssets} assets at high or critical risk`}
+            >
+              {actionables.length === 0 ? (
+                <p className="text-sm text-ink-500">
+                  No asset reached high or critical risk at this evaluation time.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {actionables.slice(0, 6).map((exposure) => (
+                    <li
+                      key={exposure.assetId}
+                      className="flex items-start justify-between gap-3 border-b border-ink-100 pb-3 last:border-0 last:pb-0"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-ink-900">{exposure.assetName}</p>
+                        <p className="mt-0.5 font-mono text-[11px] text-ink-500">
+                          {formatDecimal(exposure.distanceNauticalMiles)} nm · {exposure.estimatedWindAtAsset} kt
+                        </p>
+                        <p className="mt-1 text-[11px] text-ink-500">
+                          {RISK_STYLES[exposure.riskLevel].action}
+                        </p>
+                      </div>
+                      <RiskBadge level={exposure.riskLevel} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-4">
+                <Link to="/app/advisory">
+                  <Button variant="secondary" className="w-full">
+                    Open advisory
+                  </Button>
+                </Link>
+              </div>
+            </Card>
 
-      <Card title="Every assessed asset" subtitle="Ordered by severity, then distance">
-        <ExposureTable exposures={assessment.exposures} />
-      </Card>
-    </div>
+            <AdvisoryPreview advisory={assessment.advisory} />
+          </div>
+        </div>
+
+        <Card title="Every assessed asset" subtitle="Ordered by severity, then by distance from the centre">
+          <ExposureTable exposures={assessment.exposures} />
+        </Card>
+      </div>
+    </>
   );
 }
 
@@ -147,11 +191,24 @@ function isActionable(exposure: AssetExposure): boolean {
   return exposure.riskLevel === 'HIGH' || exposure.riskLevel === 'CRITICAL';
 }
 
-function Metric({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+function MetricCard({
+  icon,
+  label,
+  value,
+  mono = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
   return (
-    <div>
-      <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</p>
-      <p className={mono === true ? 'mt-1 font-mono text-sm text-slate-800 dark:text-slate-100' : 'mt-1 text-sm font-medium text-slate-800 dark:text-slate-100'}>
+    <div className="card p-4">
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">
+        <span className="text-brand-600">{icon}</span>
+        {label}
+      </div>
+      <p className={mono ? 'mt-2 font-mono text-sm font-semibold text-ink-900' : 'mt-2 font-display text-lg font-bold tracking-tight text-ink-900'}>
         {value}
       </p>
     </div>

@@ -1,235 +1,358 @@
-import { useState, type FormEvent } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  BellRing,
+  ChevronDown,
+  LayoutDashboard,
+  Loader2,
+  LogOut,
+  Map,
+  Menu,
+  ServerCog,
+  ShieldAlert,
+  Sparkles,
+  X,
+} from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useApiHealth } from '@/api/hooks';
+import { Logo } from '@/components/Logo';
+import { ErrorNote } from '@/components/ui';
 import { useAuth } from '@/auth/AuthProvider';
 import { useRunDemo } from '@/demo/useRunDemo';
-import { useTheme } from '@/hooks/useTheme';
 import { cn } from '@/lib/cn';
-import { Button, Card, ErrorNote, Field, Input, Spinner, StatusDot } from './ui';
-
-const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', description: 'Storm status and risk totals' },
-  { to: '/track', label: 'Track visualizer', description: 'Track, centre and assets on the map' },
-  { to: '/assessment', label: 'Impact assessment', description: 'Run an assessment' },
-  { to: '/assets', label: 'Asset management', description: 'Critical infrastructure registry' },
-  { to: '/advisory', label: 'Advisory panel', description: 'Generated early-warning text' },
-];
 
 /**
- * Frame around every screen: navigation, session state, backend reachability and the demo control.
+ * The authenticated console frame.
  *
- * The API health badge is a real call to the unauthenticated health probe, so "connected" means the
- * backend answered, not that a request succeeded once. When the session is missing the shell renders
- * the sign-in screen instead of the console, which keeps every route protected in one place rather
- * than per page.
+ * Top navigation rather than a sidebar: this product is read on a laptop during a briefing and on a
+ * phone on a beach, and a horizontal bar survives both. The shell owns the session gate, the API
+ * reachability badge and the demo control, so every route inside it is protected by construction.
  */
+
+const NAV_ITEMS = [
+  { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/app/track', label: 'Track', icon: Map, end: false },
+  { to: '/app/assessment', label: 'Assessment', icon: ShieldAlert, end: false },
+  { to: '/app/assets', label: 'Assets', icon: ServerCog, end: false },
+  { to: '/app/advisory', label: 'Advisory', icon: BellRing, end: false },
+];
+
 export function AppShell() {
   const { isAuthenticated } = useAuth();
 
   if (!isAuthenticated) {
-    return <SignInScreen />;
+    return <SignInRequired />;
   }
-  return <AuthenticatedShell />;
+  return <Console />;
 }
 
-function AuthenticatedShell() {
-  const { principal, logout } = useAuth();
-  const { theme, toggle } = useTheme();
-  const health = useApiHealth();
-  const demo = useRunDemo();
-  const navigate = useNavigate();
-  const [demoError, setDemoError] = useState<unknown>(null);
-
-  const runDemo = async () => {
-    setDemoError(null);
-    try {
-      await demo.run();
-      navigate('/');
-    } catch (cause) {
-      setDemoError(cause);
-    }
-  };
-
-  const backendUp = health.data?.status === 'UP';
+/** Shown when a route is opened without a session, with the target kept for after sign-in. */
+function SignInRequired() {
+  const location = useLocation();
 
   return (
-    <div className="min-h-screen lg:flex">
-      <aside className="border-b border-slate-200 bg-white/70 backdrop-blur lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-r dark:border-slate-800 dark:bg-slate-900/60">
-        <div className="flex items-center justify-between gap-3 px-5 py-4 lg:block">
-          <div>
-            <p className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-              Cyclone Impact Forecaster
-            </p>
-            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-              Infrastructure vulnerability console
-            </p>
-          </div>
-          <Button variant="secondary" className="lg:hidden" onClick={toggle} aria-label="Toggle theme">
-            {theme === 'dark' ? 'Light' : 'Dark'}
-          </Button>
+    <div className="grid min-h-screen place-items-center bg-ink-50 px-5">
+      <div className="card w-full max-w-md p-8 text-center">
+        <Logo className="justify-center" />
+        <h1 className="mt-6 font-display text-xl font-bold tracking-tight text-ink-900">
+          Your session has ended
+        </h1>
+        <p className="mt-2 text-sm text-ink-600">
+          Sign in again to return to the console, or run the demonstration storm without an account.
+        </p>
+        <div className="mt-6 flex flex-col gap-2.5">
+          <Link to="/signin" state={{ from: location.pathname }} className="btn bg-brand-700 py-3 text-white shadow-glow hover:bg-brand-800">
+            Sign in
+          </Link>
+          <Link to="/signin?demo=1" className="btn border border-ink-200 bg-white text-ink-800 hover:bg-ink-50">
+            Run the demo storm
+          </Link>
         </div>
-
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:overflow-visible lg:pb-0">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              className={({ isActive }) => cn('nav-link whitespace-nowrap', isActive && 'nav-link-active')}
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="space-y-3 px-5 py-4 lg:mt-4 lg:border-t lg:border-slate-200 dark:lg:border-slate-800">
-          <Button onClick={runDemo} busy={demo.isRunning} className="w-full">
-            {demo.isRunning ? 'Running demo' : 'Demo mode'}
-          </Button>
-          {demoError !== null ? <ErrorNote error={demoError} /> : null}
-          <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-            Loads a Bay of Bengal track and seven coastal assets through the live API.
-          </p>
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white/70 px-5 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/60">
-          <div className="flex items-center gap-4">
-            {health.isPending ? (
-              <span className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                <Spinner /> checking API
-              </span>
-            ) : (
-              <StatusDot
-                ok={backendUp}
-                label={backendUp ? `API ${health.data?.status}` : 'API unreachable'}
-              />
-            )}
-            {principal !== null ? (
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                Signed in as <span className="font-medium text-slate-700 dark:text-slate-200">{principal.username}</span>{' '}
-                <span className="font-mono">[{principal.roles.join(', ')}]</span>
-              </span>
-            ) : null}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" className="hidden lg:inline-flex" onClick={toggle}>
-              {theme === 'dark' ? 'Light theme' : 'Dark theme'}
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                logout();
-                navigate('/');
-              }}
-            >
-              Sign out
-            </Button>
-          </div>
-        </header>
-
-        <main className="min-w-0 flex-1 px-5 py-5">
-          <Outlet />
-        </main>
-
-        <footer className="border-t border-slate-200 px-5 py-3 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
-          Screening model: linear interpolation between published fixes with a 75 nm exponential wind-field decay.
-          Cross-check against official NHC/JTWC/IMD products before operational use.
-        </footer>
       </div>
     </div>
   );
 }
 
-function SignInScreen() {
-  const { login } = useAuth();
+function Console() {
+  const { principal, logout } = useAuth();
+  const health = useApiHealth();
   const demo = useRunDemo();
   const navigate = useNavigate();
-  const [username, setUsername] = useState(import.meta.env.VITE_DEMO_USERNAME ?? 'analyst');
-  const [password, setPassword] = useState(import.meta.env.VITE_DEMO_PASSWORD ?? 'cyclone-demo-analyst');
-  const [error, setError] = useState<unknown>(null);
-  const [busy, setBusy] = useState(false);
+  const location = useLocation();
+  const [demoError, setDemoError] = useState<unknown>(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const onSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await login(username, password);
-      navigate('/');
-    } catch (cause) {
-      setError(cause);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const backendUp = health.data?.status === 'UP';
 
   const runDemo = async () => {
-    setError(null);
+    setDemoError(null);
     try {
       await demo.run();
-      navigate('/');
+      navigate('/app');
     } catch (cause) {
-      setError(cause);
+      setDemoError(cause);
     }
   };
 
+  // Close the mobile sheet on navigation, so tapping a link does not leave a panel covering the page.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
   return (
-    <div className="grid min-h-screen place-items-center px-5 py-10">
-      <div className="w-full max-w-md space-y-4">
-        <div className="text-center">
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-            Cyclone Impact &amp; Infrastructure Vulnerability Forecaster
-          </h1>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Sign in with a configured account, or jump straight into the demonstration.
-          </p>
+    <div className="flex min-h-screen flex-col bg-ink-50">
+      <header className="sticky top-0 z-40 border-b border-ink-200/80 bg-white/85 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 w-full max-w-[100rem] items-center gap-4 px-4 sm:px-6">
+          <Link to="/app" className="rounded-lg" aria-label="CycloneAI console home">
+            <Logo size="size-8" />
+          </Link>
+
+          <nav className="ml-2 hidden items-center gap-1 lg:flex" aria-label="Console sections">
+            {NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) => cn('nav-link', isActive && 'nav-link-active')}
+              >
+                <item.icon className="size-4" />
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+
+          <div className="ml-auto flex items-center gap-2">
+            <StatusPill up={backendUp} pending={health.isPending} />
+
+            <button
+              type="button"
+              onClick={runDemo}
+              disabled={demo.isRunning}
+              className="btn hidden bg-brand-700 px-3.5 py-2 text-white shadow-glow transition hover:bg-brand-800 disabled:opacity-70 sm:inline-flex"
+            >
+              {demo.isRunning ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+              <span className="hidden md:inline">{demo.isRunning ? 'Running demo…' : 'Run demo'}</span>
+            </button>
+
+            <UserMenu
+              username={principal?.username ?? 'unknown'}
+              roles={principal?.roles ?? []}
+              onSignOut={() => {
+                logout();
+                navigate('/');
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen((open) => !open)}
+              aria-expanded={mobileNavOpen}
+              aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
+              className="btn border border-ink-200 bg-white px-3 py-2 text-ink-700 lg:hidden"
+            >
+              {mobileNavOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+            </button>
+          </div>
         </div>
 
-        <Card title="Sign in" subtitle="Bearer token issued by the backend">
-          <form className="space-y-3" onSubmit={onSubmit}>
-            <Field label="Username">
-              <Input
-                value={username}
-                autoComplete="username"
-                onChange={(event) => setUsername(event.target.value)}
-                required
-                maxLength={64}
-              />
-            </Field>
-            <Field label="Password">
-              <Input
-                type="password"
-                value={password}
-                autoComplete="current-password"
-                onChange={(event) => setPassword(event.target.value)}
-                required
-                maxLength={256}
-              />
-            </Field>
-            <Button type="submit" busy={busy} className="w-full">
-              Sign in
-            </Button>
-          </form>
+        <AnimatePresence>
+          {mobileNavOpen ? (
+            <motion.nav
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+              className="overflow-hidden border-t border-ink-200/80 bg-white lg:hidden"
+              aria-label="Console sections"
+            >
+              <div className="flex flex-col gap-1 px-4 py-3">
+                {NAV_ITEMS.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) => cn('nav-link', isActive && 'nav-link-active')}
+                  >
+                    <item.icon className="size-4" />
+                    {item.label}
+                  </NavLink>
+                ))}
+                <button
+                  type="button"
+                  onClick={runDemo}
+                  disabled={demo.isRunning}
+                  className="btn mt-1 bg-brand-700 py-2.5 text-white sm:hidden"
+                >
+                  {demo.isRunning ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                  Run demo storm
+                </button>
+              </div>
+            </motion.nav>
+          ) : null}
+        </AnimatePresence>
+      </header>
 
-          <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-800">
-            <Button variant="secondary" className="w-full" onClick={runDemo} busy={demo.isRunning}>
-              Demo mode (sign in as demo analyst)
-            </Button>
-            <p className="mt-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-              Signs in with the configured demo account, registers the sample assets, then runs a real assessment.
-            </p>
-          </div>
+      {demoError !== null ? (
+        <div className="mx-auto w-full max-w-[100rem] px-4 pt-4 sm:px-6">
+          <ErrorNote error={demoError} />
+        </div>
+      ) : null}
 
-          {error !== null ? <div className="mt-3"><ErrorNote error={error} /></div> : null}
-        </Card>
+      <AnimatePresence mode="wait">
+        <motion.main
+          key={location.pathname}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          className="mx-auto w-full max-w-[100rem] flex-1 px-4 py-6 sm:px-6 sm:py-8"
+        >
+          <Outlet />
+        </motion.main>
+      </AnimatePresence>
 
-        <p className="text-center text-[11px] text-slate-500 dark:text-slate-400">
-          Demo credentials come from the backend's app.security.users and the frontend's VITE_DEMO_* variables.
-        </p>
-      </div>
+      <footer className="border-t border-ink-200/80 bg-white px-4 py-4 text-[11px] leading-relaxed text-ink-500 sm:px-6">
+        <div className="mx-auto flex max-w-[100rem] flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            Screening model: linear interpolation between published fixes with 75 nm exponential wind-field decay.
+          </p>
+          <p>Cross-check against official NHC / JTWC / IMD products before operational use.</p>
+        </div>
+      </footer>
     </div>
+  );
+}
+
+function StatusPill({ up, pending }: { up: boolean; pending: boolean }) {
+  const label = pending ? 'Checking API' : up ? 'API live' : 'API unreachable';
+  const colour = pending ? 'bg-ink-400' : up ? 'bg-accent-500' : 'bg-coral-500';
+
+  return (
+    <span
+      title={label}
+      className="hidden items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-ink-600 sm:inline-flex"
+    >
+      <span className={cn('size-2 rounded-full', colour, pending && 'animate-pulse')} />
+      {label}
+    </span>
+  );
+}
+
+function UserMenu({
+  username,
+  roles,
+  onSignOut,
+}: {
+  username: string;
+  roles: string[];
+  onSignOut: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const container = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      if (container.current !== null && !container.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={container} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={cn(
+          'flex items-center gap-2 rounded-xl border px-2 py-1.5 transition',
+          open ? 'border-brand-300 bg-brand-50' : 'border-ink-200 bg-white hover:border-ink-300',
+        )}
+      >
+        <span className="grid size-7 place-items-center rounded-lg bg-brand-700 text-xs font-bold uppercase text-white">
+          {username.slice(0, 1)}
+        </span>
+        <span className="hidden max-w-[7rem] truncate text-sm font-semibold text-ink-800 sm:block">
+          {username}
+        </span>
+        <ChevronDown className={cn('size-4 text-ink-400 transition', open && 'rotate-180')} />
+      </button>
+
+      <AnimatePresence>
+        {open ? (
+          <motion.div
+            role="menu"
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute right-0 mt-2 w-60 origin-top-right overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-lift"
+          >
+            <div className="border-b border-ink-100 px-4 py-3">
+              <p className="truncate text-sm font-semibold text-ink-900">{username}</p>
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {roles.map((role) => (
+                  <span key={role} className="badge bg-brand-50 text-brand-700 ring-brand-100">
+                    {role}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <MenuLink to="/app/assets" icon={<ServerCog className="size-4" />} label="Asset registry" onSelect={() => setOpen(false)} />
+            <MenuLink to="/app/advisory" icon={<BellRing className="size-4" />} label="Latest advisory" onSelect={() => setOpen(false)} />
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={onSignOut}
+              className="flex w-full items-center gap-2.5 border-t border-ink-100 px-4 py-3 text-sm font-medium text-coral-700 transition hover:bg-coral-50"
+            >
+              <LogOut className="size-4" />
+              Sign out
+            </button>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function MenuLink({
+  to,
+  icon,
+  label,
+  onSelect,
+}: {
+  to: string;
+  icon: ReactNode;
+  label: string;
+  onSelect: () => void;
+}) {
+  return (
+    <Link
+      to={to}
+      role="menuitem"
+      onClick={onSelect}
+      className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-ink-700 transition hover:bg-ink-50"
+    >
+      {icon}
+      {label}
+    </Link>
   );
 }
